@@ -1,9 +1,8 @@
 library(shiny)
 
 ui <- fluidPage(
-  #icon("github", lib = "font-awesome", "fa-2x"),
   tags$style(".fa-github {color:black}"),
-  headerPanel(tagList("Gambler's Ruin", a(icon("github", lib = "font-awesome", "fa-1x"), href="https://github.com/NBwr"))),
+  headerPanel(tagList("Gambler's Ruin", a(icon("github", lib = "font-awesome", "fa-1x"), href="https://github.com/NBwr/gamblers-ruin"))),
   #navbarPage(icon("calendar")),
   sidebarPanel(
     numericInput('probs', 'Probability of winning single bets', round(9/19,3),
@@ -19,15 +18,25 @@ ui <- fluidPage(
     numericInput('seeed', 'Seed', 123,
                  min = 1, max = 100000)
     
-    
   ),
   mainPanel(
     plotOutput('plot2'),
-    textOutput("stats_info")
+    textOutput("stats_info"),
+    plotOutput('plot3')
   )
 )
 
 server <- function(input, output) {
+  
+  Pn = function(p,n=10,m=10,verbose=0) {#Probability to win
+    k=length(p)
+    pn = rep(NA,k)
+    io = (1-p)/p #inverse odds
+    if (verbose >1) return(c(io^n-1, io^(n+m)-1))
+    pn[p< 0.5] = ((io^n-1)/(io^(n+m)-1))[p< 0.5]
+    pn[p == 0.5] = n/(n+m)
+    return(pn)
+  }  
   
   variables = reactive({
     p = input$probs
@@ -51,21 +60,18 @@ server <- function(input, output) {
   abline(h=0,col=2);abline(h=variables()$m,col="darkgreen")
   })
   
-  output$stats_info = renderText({
-    paste0("You have simulated ", variables()$M, " bets. At the end of the simulation, ", 
-           sum(tail(variables()$y1,1)>variables()$n), " bets are larger than the initial start capital of ", variables()$n,
-           " Euro per bet, while ", sum(tail(variables()$y1,1)<variables()$n), " bets are smaller. 
-           Running these bets and odds in a casino, you would have made ", sum(tail(variables()$y1,1))-variables()$M*variables()$n, " Euro.") 
+  output$plot3 = renderPlot({
+    p = seq(variables()$p, 0.5, length=100)
+    plot(p, Pn(p, variables()$n, variables()$m-variables()$n), type = 'l', xlab = 'p',
+         ylab = 'Probability to win', xlim = c(variables()$p,0.5),
+         lwd=2,lty=1, col = "darkblue");grid()
   })
-  #dev.off()
-  #png("figures/RandomWalks1.png",width=800,height = 400)
-  #matplot(y2,type="l",col=rgb(0,0,1,0.5),lty=1,ylim=c(0,n+m));grid()
-  #title("p=0.5")
-  #abline(h=0,col=2);abline(h=n+m,col="darkgreen")
-  #dev.off()
   
   
-
+  output$stats_info = renderText({
+    paste0("The odds of winning ", variables()$m-variables()$n, " before losing ", 
+           variables()$n, " are: ", formatC(Pn(variables()$p, variables()$n, variables()$m-variables()$n)*100, format="e", digits=4), "%")
+  })
 }
 
 shinyApp(ui = ui, server = server)
